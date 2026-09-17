@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'booking_screen.dart';
 
 class EventDetailsScreen extends StatelessWidget {
   final Map<String, dynamic> event;
@@ -137,8 +138,10 @@ class EventDetailsScreen extends StatelessWidget {
           onPressed: isSoldOut
               ? null
               : () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Booking flow coming next')),
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => BookingScreen(event: event),
+                    ),
                   );
                 },
           style: ElevatedButton.styleFrom(
