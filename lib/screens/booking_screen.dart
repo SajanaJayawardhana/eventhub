@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../main.dart';
+import '../services/notification_service.dart';
 
 class BookingScreen extends StatefulWidget {
   final Map<String, dynamic> event;
@@ -66,6 +67,11 @@ class _BookingScreenState extends State<BookingScreen> {
           .from('events')
           .update({'available_seats': currentAvailable - _seatsRequested})
           .eq('id', widget.event['id']);
+
+      await NotificationService.showNotification(
+        title: 'Booking Confirmed',
+        body: 'Your booking for ${widget.event['name']} is confirmed.',
+      );
 
       if (mounted) {
         _showSuccessDialog();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
+import '../services/notification_service.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -123,6 +124,11 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           .from('events')
           .update({'available_seats': currentAvailable + seatsBooked})
           .eq('id', eventId);
+
+      await NotificationService.showNotification(
+        title: 'Booking Cancelled',
+        body: 'Your booking for ${booking['events']['name']} has been cancelled.',
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
