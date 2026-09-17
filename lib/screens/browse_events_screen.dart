@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../main.dart';
+import 'event_details_screen.dart';
 
 class BrowseEventsScreen extends StatefulWidget {
   const BrowseEventsScreen({super.key});
@@ -163,8 +164,10 @@ class _EventCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Event details coming soon')),
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => EventDetailsScreen(event: event),
+            ),
           );
         },
         child: Column(
