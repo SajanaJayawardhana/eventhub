@@ -49,9 +49,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       setState(() => _isLoading = false);
     } catch (error) {
+      debugPrint('Error fetching profile: $error');
       if (mounted) {
         setState(() => _isLoading = false);
-        // We'll show a retry UI if this fails
       }
     }
   }
@@ -78,11 +78,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }
     } catch (error) {
+      debugPrint('Error updating profile: $error');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating profile: $error'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+          const SnackBar(
+            content: Text('Something went wrong. Please try again.'),
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -146,18 +147,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Center(
-              child: Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                    child: Icon(
-                      Icons.person,
-                      size: 60,
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                ],
+              child: CircleAvatar(
+                radius: 50,
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                child: Icon(
+                  Icons.person,
+                  size: 60,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -222,6 +219,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onPressed: _isSaving ? null : _updateProfile,
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: _isSaving
                   ? const SizedBox(

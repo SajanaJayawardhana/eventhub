@@ -24,7 +24,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
   String _category = 'Music';
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _selectedTime = const TimeOfDay(hour: 18, minute: 0);
-  bool _isLoading = false;
+  bool _isSaving = false;
 
   final List<String> _categories = [
     'Music',
@@ -90,11 +90,11 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    setState(() => _isSaving = true);
 
     try {
       final userId = supabase.auth.currentUser?.id;
-      if (userId == null) return;
+      if (userId == null) throw Exception('User not logged in');
 
       final eventDateTime = DateTime(
         _selectedDate.year,
@@ -120,11 +120,9 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
       };
 
       if (widget.existingEvent == null) {
-        // Create Mode
         eventData['available_seats'] = totalSeats;
         await supabase.from('events').insert(eventData);
       } else {
-        // Edit Mode
         final int oldTotal = widget.existingEvent!['total_seats'];
         final int oldAvailable = widget.existingEvent!['available_seats'];
         final int diff = totalSeats - oldTotal;
@@ -138,18 +136,25 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Event saved successfully!')),
+          const SnackBar(
+            content: Text('Event saved successfully!'),
+            backgroundColor: Colors.green,
+          ),
         );
         Navigator.pop(context, true);
       }
     } catch (error) {
+      debugPrint('Save Event Error: $error');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving event: $error')),
+          const SnackBar(
+            content: Text('Something went wrong. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -173,6 +178,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Event Name',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.title),
                 ),
                 validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
               ),
@@ -182,11 +188,12 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Category',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.category),
                 ),
                 items: _categories.map((c) {
                   return DropdownMenuItem(value: c, child: Text(c));
                 }).toList(),
-                onChanged: (v) => setState(() => _category = v!),
+                onChanged: _isSaving ? null : (v) => setState(() => _category = v!),
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -194,6 +201,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Description',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.description),
                 ),
                 maxLines: 3,
                 validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
@@ -204,6 +212,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Location',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.location_on),
                 ),
                 validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
               ),
@@ -212,7 +221,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _pickDate,
+                      onPressed: _isSaving ? null : _pickDate,
                       icon: const Icon(Icons.calendar_today),
                       label: Text(DateFormat('MMM d, yyyy').format(_selectedDate)),
                     ),
@@ -220,7 +229,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _pickTime,
+                      onPressed: _isSaving ? null : _pickTime,
                       icon: const Icon(Icons.access_time),
                       label: Text(_selectedTime.format(context)),
                     ),
@@ -239,7 +248,11 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                         border: OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.number,
-                      validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Required';
+                        if (double.tryParse(v) == null) return 'Invalid price';
+                        return null;
+                      },
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -268,17 +281,23 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Image URL (Optional)',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.image),
                 ),
               ),
               const SizedBox(height: 32),
               ElevatedButton(
-                onPressed: _isLoading ? null : _save,
+                onPressed: _isSaving ? null : _save,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: _isLoading
-                    ? const CircularProgressIndicator()
-                    : const Text('Save Event', style: TextStyle(fontSize: 16)),
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Save Event', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ],
           ),

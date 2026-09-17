@@ -42,7 +42,6 @@ class _BookingScreenState extends State<BookingScreen> {
       final userId = supabase.auth.currentUser?.id;
       if (userId == null) throw Exception('User not logged in');
 
-      // 1. Double check availability right before booking (Simple approach)
       final eventResponse = await supabase
           .from('events')
           .select('available_seats')
@@ -54,7 +53,6 @@ class _BookingScreenState extends State<BookingScreen> {
         throw Exception('Not enough seats available anymore');
       }
 
-      // 2. Insert Booking
       await supabase.from('bookings').insert({
         'event_id': widget.event['id'],
         'user_id': userId,
@@ -62,7 +60,6 @@ class _BookingScreenState extends State<BookingScreen> {
         'status': 'confirmed',
       });
 
-      // 3. Update Event Seats
       await supabase
           .from('events')
           .update({'available_seats': currentAvailable - _seatsRequested})
@@ -77,11 +74,12 @@ class _BookingScreenState extends State<BookingScreen> {
         _showSuccessDialog();
       }
     } catch (error) {
+      debugPrint('Booking Error: $error');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Booking failed: ${error.toString()}'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+          const SnackBar(
+            content: Text('Something went wrong. Please try again.'),
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -111,7 +109,6 @@ class _BookingScreenState extends State<BookingScreen> {
         actions: [
           FilledButton(
             onPressed: () {
-              // Navigate back to BrowseEventsScreen (pop twice)
               Navigator.of(context).pop(); // Close dialog
               Navigator.of(context).pop(); // Pop BookingScreen
               Navigator.of(context).pop(); // Pop EventDetailsScreen
@@ -138,6 +135,8 @@ class _BookingScreenState extends State<BookingScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -182,28 +181,29 @@ class _BookingScreenState extends State<BookingScreen> {
             const Text(
               'Select Seats',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 IconButton.filledTonal(
-                  onPressed: _seatsRequested > 1
-                      ? () => setState(() => _seatsRequested--)
-                      : null,
+                  onPressed: _isLoading || _seatsRequested <= 1
+                      ? null
+                      : () => setState(() => _seatsRequested--),
                   icon: const Icon(Icons.remove),
                 ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
                   child: Text(
                     '$_seatsRequested',
-                    style: Theme.of(context).textTheme.headlineMedium,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
                 IconButton.filledTonal(
-                  onPressed: _seatsRequested < _availableSeats
-                      ? () => setState(() => _seatsRequested++)
-                      : null,
+                  onPressed: _isLoading || _seatsRequested >= _availableSeats
+                      ? null
+                      : () => setState(() => _seatsRequested++),
                   icon: const Icon(Icons.add),
                 ),
               ],
@@ -249,9 +249,14 @@ class _BookingScreenState extends State<BookingScreen> {
             onPressed: _isLoading ? null : _confirmBooking,
             style: ElevatedButton.styleFrom(
               minimumSize: const Size.fromHeight(56),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: _isLoading
-                ? const CircularProgressIndicator()
+                ? const SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
                 : const Text(
                     'Confirm Booking',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),

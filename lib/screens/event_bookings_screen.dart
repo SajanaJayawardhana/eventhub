@@ -59,9 +59,10 @@ class _EventBookingsScreenState extends State<EventBookingsScreen> {
         });
       }
     } catch (error) {
+      debugPrint('Error fetching event bookings: $error');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching bookings: $error')),
+          const SnackBar(content: Text('Something went wrong. Please try again.')),
         );
         setState(() => _isLoading = false);
       }
@@ -100,9 +101,19 @@ class _EventBookingsScreenState extends State<EventBookingsScreen> {
                     onRefresh: _fetchBookings,
                     child: _bookings.isEmpty
                         ? ListView(
-                            children: const [
-                              SizedBox(height: 100),
-                              Center(child: Text('No bookings yet')),
+                            children: [
+                              const SizedBox(height: 100),
+                              Center(
+                                child: Column(
+                                  children: [
+                                    Icon(Icons.people_outline,
+                                        size: 64, color: Colors.grey[300]),
+                                    const SizedBox(height: 16),
+                                    const Text('No bookings yet',
+                                        style: TextStyle(color: Colors.grey)),
+                                  ],
+                                ),
+                              ),
                             ],
                           )
                         : ListView.separated(
@@ -116,8 +127,6 @@ class _EventBookingsScreenState extends State<EventBookingsScreen> {
                                   as Map<String, dynamic>?;
                               final date =
                                   DateTime.parse(booking['created_at']);
-                              final isConfirmed =
-                                  booking['status'] == 'confirmed';
 
                               return ListTile(
                                 contentPadding: EdgeInsets.zero,
@@ -129,8 +138,9 @@ class _EventBookingsScreenState extends State<EventBookingsScreen> {
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    if (profile?['phone'] != null)
-                                      Text('Phone: ${profile!['phone']}'),
+                                    if (profile?['phone'] != null &&
+                                        profile!['phone'].toString().isNotEmpty)
+                                      Text('Phone: ${profile['phone']}'),
                                     Text(
                                         'Booked on: ${DateFormat('MMM d, h:mm a').format(date)}'),
                                   ],

@@ -41,9 +41,10 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
         });
       }
     } catch (error) {
+      debugPrint('Error fetching my events: $error');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching events: $error')),
+          const SnackBar(content: Text('Something went wrong. Please try again.')),
         );
         setState(() => _isLoading = false);
       }
@@ -81,9 +82,13 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
           _fetchMyEvents();
         }
       } catch (error) {
+        debugPrint('Delete Event Error: $error');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete event: $error')),
+            const SnackBar(
+              content: Text('Something went wrong. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       }
@@ -99,9 +104,18 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
             ? const Center(child: CircularProgressIndicator())
             : _myEvents.isEmpty
                 ? ListView(
-                    children: const [
-                      SizedBox(height: 100),
-                      Center(child: Text("You haven't created any events yet")),
+                    children: [
+                      const SizedBox(height: 100),
+                      Center(
+                        child: Column(
+                          children: [
+                            Icon(Icons.event_note, size: 64, color: Colors.grey[300]),
+                            const SizedBox(height: 16),
+                            const Text("You haven't created any events yet",
+                                style: TextStyle(color: Colors.grey)),
+                          ],
+                        ),
+                      ),
                     ],
                   )
                 : ListView.builder(
@@ -116,6 +130,8 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 16),
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(

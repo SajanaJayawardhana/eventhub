@@ -29,49 +29,51 @@ class _BrowseEventsScreenState extends State<BrowseEventsScreen> {
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
-    await Future.wait([
-      _fetchEvents(),
-      _loadFavorites(),
-    ]);
-    setState(() => _isLoading = false);
-    _filterEvents();
-  }
-
-  Future<void> _fetchEvents() async {
     try {
-      final data = await supabase
-          .from('events')
-          .select()
-          .order('event_date', ascending: true);
-
-      final List<Map<String, dynamic>> events =
-          List<Map<String, dynamic>>.from(data);
-
-      // Extract unique categories
-      final Set<String> categorySet = {'All'};
-      for (var event in events) {
-        if (event['category'] != null) {
-          categorySet.add(event['category'] as String);
-        }
-      }
-
-      _allEvents = events;
-      _categories = categorySet.toList()..sort();
+      await Future.wait([
+        _fetchEvents(),
+        _loadFavorites(),
+      ]);
     } catch (error) {
+      debugPrint('Error loading browse data: $error');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching events: $error')),
+          const SnackBar(content: Text('Could not load events. Please refresh.')),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _filterEvents();
       }
     }
   }
 
+  Future<void> _fetchEvents() async {
+    final data = await supabase
+        .from('events')
+        .select()
+        .order('event_date', ascending: true);
+
+    final List<Map<String, dynamic>> events =
+        List<Map<String, dynamic>>.from(data);
+
+    final Set<String> categorySet = {'All'};
+    for (var event in events) {
+      if (event['category'] != null) {
+        categorySet.add(event['category'] as String);
+      }
+    }
+
+    _allEvents = events;
+    _categories = categorySet.toList()..sort();
+  }
+
   Future<void> _loadFavorites() async {
     final favorites = await FavoritesService.getFavoriteIds();
-    setState(() {
-      _favoriteIds = favorites;
-    });
+    _favoriteIds = favorites;
   }
 
   void _filterEvents() {
@@ -83,7 +85,8 @@ class _BrowseEventsScreenState extends State<BrowseEventsScreen> {
             .toString()
             .toLowerCase()
             .contains(_searchQuery.toLowerCase());
-        final matchesFavorites = !_showOnlyFavorites || _favoriteIds.contains(event['id']);
+        final matchesFavorites =
+            !_showOnlyFavorites || _favoriteIds.contains(event['id']);
 
         return matchesCategory && matchesSearch && matchesFavorites;
       }).toList();
@@ -96,8 +99,12 @@ class _BrowseEventsScreenState extends State<BrowseEventsScreen> {
   }
 
   Future<void> _toggleFavorite(String eventId) async {
-    await FavoritesService.toggleFavorite(eventId);
-    await _refreshFavorites();
+    try {
+      await FavoritesService.toggleFavorite(eventId);
+      await _refreshFavorites();
+    } catch (e) {
+      debugPrint('Error toggling favorite: $e');
+    }
   }
 
   @override
@@ -173,9 +180,23 @@ class _BrowseEventsScreenState extends State<BrowseEventsScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredEvents.isEmpty
                     ? ListView(
-                        children: const [
-                          SizedBox(height: 100),
-                          Center(child: Text('No events found')),
+                        children: [
+                          const SizedBox(height: 100),
+                          Center(
+                            child: Column(
+                              children: [
+                                Icon(Icons.event_busy,
+                                    size: 64, color: Colors.grey[300]),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _showOnlyFavorites
+                                      ? 'No favorite events yet'
+                                      : 'No events found',
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       )
                     : ListView.builder(
@@ -223,6 +244,8 @@ class _EventCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () async {
@@ -231,7 +254,6 @@ class _EventCard extends StatelessWidget {
               builder: (context) => EventDetailsScreen(event: event),
             ),
           );
-          // Refresh screen state when coming back from details
           onRefreshFavorites();
         },
         child: Column(

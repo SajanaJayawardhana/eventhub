@@ -22,15 +22,23 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   }
 
   Future<void> _loadFavoriteState() async {
-    final isFav = await FavoritesService.isFavorite(widget.event['id']);
-    if (mounted) {
-      setState(() => _isFavorite = isFav);
+    try {
+      final isFav = await FavoritesService.isFavorite(widget.event['id']);
+      if (mounted) {
+        setState(() => _isFavorite = isFav);
+      }
+    } catch (e) {
+      debugPrint('Error loading favorite state: $e');
     }
   }
 
   Future<void> _toggleFavorite() async {
-    await FavoritesService.toggleFavorite(widget.event['id']);
-    _loadFavoriteState();
+    try {
+      await FavoritesService.toggleFavorite(widget.event['id']);
+      _loadFavoriteState();
+    } catch (e) {
+      debugPrint('Error toggling favorite: $e');
+    }
   }
 
   @override
@@ -67,6 +75,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
               Image.network(
                 imageUrl,
                 height: 250,
+                width: double.infinity,
                 fit: BoxFit.cover,
                 loadingBuilder: (context, child, loadingProgress) {
                   if (loadingProgress == null) return child;
@@ -187,7 +196,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                 },
           style: ElevatedButton.styleFrom(
             minimumSize: const Size.fromHeight(56),
-            backgroundColor: isSoldOut ? Colors.grey : null,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
           child: Text(
             isSoldOut ? 'Sold Out' : 'Book Now',

@@ -45,6 +45,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         }
       }
     } on AuthException catch (error) {
+      debugPrint('Signup Error: ${error.message}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -54,10 +55,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
         );
       }
     } catch (error) {
+      debugPrint('Unexpected Signup Error: $error');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('An unexpected error occurred'),
+          SnackBar(
+            content: const Text('Something went wrong. Please try again.'),
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -151,6 +154,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   onPressed: _isLoading ? null : _signUp,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   child: _isLoading
                       ? const SizedBox(
@@ -158,7 +164,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Sign Up'),
+                      : const Text('Sign Up', style: TextStyle(fontSize: 16)),
                 ),
               ],
             ),

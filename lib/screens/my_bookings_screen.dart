@@ -53,7 +53,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       final List<Map<String, dynamic>> past = [];
 
       for (var booking in bookings) {
-        final event = booking['events'] as Map<String, dynamic>;
+        final event = booking['events'] as Map<String, dynamic>?;
+        if (event == null) continue;
+
         final eventDate = DateTime.parse(event['event_date']);
         final isConfirmed = booking['status'] == 'confirmed';
 
@@ -72,9 +74,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         });
       }
     } catch (error) {
+      debugPrint('Error fetching bookings: $error');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching bookings: $error')),
+          const SnackBar(content: Text('Something went wrong. Please try again.')),
         );
         setState(() => _isLoading = false);
       }
@@ -94,6 +97,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Yes, Cancel'),
           ),
         ],
@@ -106,13 +110,11 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       final int seatsBooked = booking['seats_booked'];
       final String eventId = booking['event_id'];
 
-      // 1. Update booking status
       await supabase
           .from('bookings')
           .update({'status': 'cancelled'})
           .eq('id', booking['id']);
 
-      // 2. Increment available seats back
       final eventResponse = await supabase
           .from('events')
           .select('available_seats')
@@ -140,11 +142,12 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         _fetchBookings();
       }
     } catch (error) {
+      debugPrint('Cancel Booking Error: $error');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to cancel booking: $error'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+          const SnackBar(
+            content: Text('Something went wrong. Please try again.'),
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -172,13 +175,15 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                 onRefresh: _fetchBookings,
                 onCancel: _cancelBooking,
                 emptyMessage: 'No upcoming bookings',
+                emptyIcon: Icons.calendar_today,
               ),
               _BookingsList(
                 bookings: _pastBookings,
                 isLoading: _isLoading,
                 onRefresh: _fetchBookings,
-                onCancel: null, // Can't cancel past/cancelled bookings
+                onCancel: null,
                 emptyMessage: 'No past bookings',
+                emptyIcon: Icons.history,
               ),
             ],
           ),
@@ -194,6 +199,7 @@ class _BookingsList extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final Future<void> Function(Map<String, dynamic>)? onCancel;
   final String emptyMessage;
+  final IconData emptyIcon;
 
   const _BookingsList({
     required this.bookings,
@@ -201,6 +207,7 @@ class _BookingsList extends StatelessWidget {
     required this.onRefresh,
     required this.onCancel,
     required this.emptyMessage,
+    required this.emptyIcon,
   });
 
   @override
@@ -215,7 +222,15 @@ class _BookingsList extends StatelessWidget {
         child: ListView(
           children: [
             const SizedBox(height: 100),
-            Center(child: Text(emptyMessage)),
+            Center(
+              child: Column(
+                children: [
+                  Icon(emptyIcon, size: 64, color: Colors.grey[300]),
+                  const SizedBox(height: 16),
+                  Text(emptyMessage, style: const TextStyle(color: Colors.grey)),
+                ],
+              ),
+            ),
           ],
         ),
       );
@@ -228,7 +243,9 @@ class _BookingsList extends StatelessWidget {
         itemCount: bookings.length,
         itemBuilder: (context, index) {
           final booking = bookings[index];
-          final event = booking['events'] as Map<String, dynamic>;
+          final event = booking['events'] as Map<String, dynamic>?;
+          if (event == null) return const SizedBox.shrink();
+
           final eventDate = DateTime.parse(event['event_date']);
           final formattedDate =
               DateFormat('MMM d, yyyy · h:mm a').format(eventDate);
@@ -236,6 +253,8 @@ class _BookingsList extends StatelessWidget {
 
           return Card(
             margin: const EdgeInsets.only(bottom: 16),
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
