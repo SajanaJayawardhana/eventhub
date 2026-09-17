@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../main.dart';
+import '../services/favorites_service.dart';
 import 'event_details_screen.dart';
 
 class BrowseEventsScreen extends StatefulWidget {
@@ -15,25 +16,37 @@ class _BrowseEventsScreenState extends State<BrowseEventsScreen> {
   List<Map<String, dynamic>> _allEvents = [];
   List<Map<String, dynamic>> _filteredEvents = [];
   List<String> _categories = ['All'];
+  Set<String> _favoriteIds = {};
   String _selectedCategory = 'All';
   String _searchQuery = '';
+  bool _showOnlyFavorites = false;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchEvents();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    await Future.wait([
+      _fetchEvents(),
+      _loadFavorites(),
+    ]);
+    setState(() => _isLoading = false);
+    _filterEvents();
   }
 
   Future<void> _fetchEvents() async {
-    setState(() => _isLoading = true);
     try {
       final data = await supabase
           .from('events')
           .select()
           .order('event_date', ascending: true);
 
-      final List<Map<String, dynamic>> events = List<Map<String, dynamic>>.from(data);
+      final List<Map<String, dynamic>> events =
+          List<Map<String, dynamic>>.from(data);
 
       // Extract unique categories
       final Set<String> categorySet = {'All'};
@@ -43,20 +56,22 @@ class _BrowseEventsScreenState extends State<BrowseEventsScreen> {
         }
       }
 
-      setState(() {
-        _allEvents = events;
-        _categories = categorySet.toList()..sort();
-        _isLoading = false;
-        _filterEvents();
-      });
+      _allEvents = events;
+      _categories = categorySet.toList()..sort();
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error fetching events: $error')),
         );
       }
-      setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _loadFavorites() async {
+    final favorites = await FavoritesService.getFavoriteIds();
+    setState(() {
+      _favoriteIds = favorites;
+    });
   }
 
   void _filterEvents() {
@@ -68,9 +83,21 @@ class _BrowseEventsScreenState extends State<BrowseEventsScreen> {
             .toString()
             .toLowerCase()
             .contains(_searchQuery.toLowerCase());
-        return matchesCategory && matchesSearch;
+        final matchesFavorites = !_showOnlyFavorites || _favoriteIds.contains(event['id']);
+
+        return matchesCategory && matchesSearch && matchesFavorites;
       }).toList();
     });
+  }
+
+  Future<void> _refreshFavorites() async {
+    await _loadFavorites();
+    _filterEvents();
+  }
+
+  Future<void> _toggleFavorite(String eventId) async {
+    await FavoritesService.toggleFavorite(eventId);
+    await _refreshFavorites();
   }
 
   @override
@@ -96,38 +123,59 @@ class _BrowseEventsScreenState extends State<BrowseEventsScreen> {
         ),
         SizedBox(
           height: 60,
-          child: ListView.builder(
+          child: ListView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            itemCount: _categories.length,
-            itemBuilder: (context, index) {
-              final category = _categories[index];
-              return Padding(
+            children: [
+              Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: FilterChip(
-                  label: Text(category),
-                  selected: _selectedCategory == category,
+                  label: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.favorite, size: 16),
+                      SizedBox(width: 4),
+                      Text('Favorites'),
+                    ],
+                  ),
+                  selected: _showOnlyFavorites,
                   onSelected: (selected) {
                     setState(() {
-                      _selectedCategory = category;
+                      _showOnlyFavorites = selected;
                       _filterEvents();
                     });
                   },
                 ),
-              );
-            },
+              ),
+              const VerticalDivider(indent: 16, endIndent: 16),
+              ..._categories.map((category) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: FilterChip(
+                    label: Text(category),
+                    selected: _selectedCategory == category,
+                    onSelected: (selected) {
+                      setState(() {
+                        _selectedCategory = category;
+                        _filterEvents();
+                      });
+                    },
+                  ),
+                );
+              }),
+            ],
           ),
         ),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: _fetchEvents,
+            onRefresh: _loadData,
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredEvents.isEmpty
                     ? ListView(
                         children: const [
                           SizedBox(height: 100),
-                          Center(child: Text('No events yet')),
+                          Center(child: Text('No events found')),
                         ],
                       )
                     : ListView.builder(
@@ -135,7 +183,13 @@ class _BrowseEventsScreenState extends State<BrowseEventsScreen> {
                         itemCount: _filteredEvents.length,
                         itemBuilder: (context, index) {
                           final event = _filteredEvents[index];
-                          return _EventCard(event: event);
+                          final eventId = event['id'];
+                          return _EventCard(
+                            event: event,
+                            isFavorite: _favoriteIds.contains(eventId),
+                            onFavoriteToggle: () => _toggleFavorite(eventId),
+                            onRefreshFavorites: _refreshFavorites,
+                          );
                         },
                       ),
           ),
@@ -147,8 +201,16 @@ class _BrowseEventsScreenState extends State<BrowseEventsScreen> {
 
 class _EventCard extends StatelessWidget {
   final Map<String, dynamic> event;
+  final bool isFavorite;
+  final VoidCallback onFavoriteToggle;
+  final VoidCallback onRefreshFavorites;
 
-  const _EventCard({required this.event});
+  const _EventCard({
+    required this.event,
+    required this.isFavorite,
+    required this.onFavoriteToggle,
+    required this.onRefreshFavorites,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -163,35 +225,63 @@ class _EventCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
+        onTap: () async {
+          await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => EventDetailsScreen(event: event),
             ),
           );
+          // Refresh screen state when coming back from details
+          onRefreshFavorites();
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (imageUrl != null && imageUrl.isNotEmpty)
-              Image.network(
-                imageUrl,
-                height: 180,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
+            Stack(
+              children: [
+                if (imageUrl != null && imageUrl.isNotEmpty)
+                  Image.network(
+                    imageUrl,
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        height: 180,
+                        color: Colors.grey[200],
+                        child: const Center(child: CircularProgressIndicator()),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 180,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.broken_image,
+                          size: 64, color: Colors.grey),
+                    ),
+                  )
+                else
+                  Container(
                     height: 180,
                     color: Colors.grey[200],
-                    child: const Center(child: CircularProgressIndicator()),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) => Container(
-                  height: 180,
-                  color: Colors.grey[200],
-                  child: const Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                    child: const Icon(Icons.event, size: 64, color: Colors.grey),
+                  ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white.withOpacity(0.8),
+                    child: IconButton(
+                      icon: Icon(
+                        isFavorite ? Icons.favorite : Icons.favorite_border,
+                        color: isFavorite ? Colors.red : Colors.grey,
+                      ),
+                      onPressed: onFavoriteToggle,
+                    ),
+                  ),
                 ),
-              ),
+              ],
+            ),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -222,17 +312,21 @@ class _EventCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                      const Icon(Icons.calendar_today,
+                          size: 16, color: Colors.grey),
                       const SizedBox(width: 8),
-                      Text(formattedDate, style: const TextStyle(color: Colors.grey)),
+                      Text(formattedDate,
+                          style: const TextStyle(color: Colors.grey)),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                      const Icon(Icons.location_on,
+                          size: 16, color: Colors.grey),
                       const SizedBox(width: 8),
-                      Text(event['location'], style: const TextStyle(color: Colors.grey)),
+                      Text(event['location'],
+                          style: const TextStyle(color: Colors.grey)),
                     ],
                   ),
                   const SizedBox(height: 12),

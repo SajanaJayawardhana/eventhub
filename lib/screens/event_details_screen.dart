@@ -1,14 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../services/favorites_service.dart';
 import 'booking_screen.dart';
 
-class EventDetailsScreen extends StatelessWidget {
+class EventDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> event;
 
   const EventDetailsScreen({super.key, required this.event});
 
   @override
+  State<EventDetailsScreen> createState() => _EventDetailsScreenState();
+}
+
+class _EventDetailsScreenState extends State<EventDetailsScreen> {
+  bool _isFavorite = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFavoriteState();
+  }
+
+  Future<void> _loadFavoriteState() async {
+    final isFav = await FavoritesService.isFavorite(widget.event['id']);
+    if (mounted) {
+      setState(() => _isFavorite = isFav);
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    await FavoritesService.toggleFavorite(widget.event['id']);
+    _loadFavoriteState();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final event = widget.event;
     final DateTime eventDate = DateTime.parse(event['event_date']);
     final String formattedDate =
         DateFormat('MMM d, yyyy · h:mm a').format(eventDate);
@@ -22,6 +49,15 @@ class EventDetailsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(event['name']),
+        actions: [
+          IconButton(
+            icon: Icon(
+              _isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: _isFavorite ? Colors.red : null,
+            ),
+            onPressed: _toggleFavorite,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -43,7 +79,8 @@ class EventDetailsScreen extends StatelessWidget {
                 errorBuilder: (context, error, stackTrace) => Container(
                   height: 250,
                   color: Colors.grey[200],
-                  child: const Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                  child: const Icon(Icons.broken_image,
+                      size: 64, color: Colors.grey),
                 ),
               ),
             Padding(
@@ -60,7 +97,8 @@ class EventDetailsScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   Chip(
                     label: Text(event['category'] ?? 'General'),
-                    backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                    backgroundColor:
+                        Theme.of(context).colorScheme.secondaryContainer,
                     labelStyle: TextStyle(
                       color: Theme.of(context).colorScheme.onSecondaryContainer,
                     ),
@@ -90,14 +128,17 @@ class EventDetailsScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('$availableSeats of $totalSeats seats available'),
-                      Text('${(availableSeats / totalSeats * 100).toInt()}% left'),
+                      Text(
+                          '${(availableSeats / totalSeats * 100).toInt()}% left'),
                     ],
                   ),
                   const SizedBox(height: 8),
                   LinearProgressIndicator(
                     value: occupancyRate,
                     backgroundColor: Colors.grey[200],
-                    color: isSoldOut ? Colors.red : Theme.of(context).colorScheme.primary,
+                    color: isSoldOut
+                        ? Colors.red
+                        : Theme.of(context).colorScheme.primary,
                     minHeight: 8,
                     borderRadius: BorderRadius.circular(4),
                   ),

@@ -10,6 +10,8 @@ Future<void> main() async {
 
   await NotificationService.initialize();
 
+  // Supabase.initialize automatically handles local session persistence
+  // so users stay logged in across app restarts.
   await Supabase.initialize(
     url: 'https://kpexslwrsstfkelyowbq.supabase.co',
     anonKey: 'sb_publishable_ZA7A8pzOf_BWwNdSKLEE6A_USDNtP0_',
